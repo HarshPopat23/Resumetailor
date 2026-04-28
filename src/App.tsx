@@ -24,7 +24,7 @@ import { cn } from "./lib/utils";
 export default function App() {
   const [cvText, setCvText] = useState("");
   const [jobDescription, setJobDescription] = useState("");
-  const [output, setOutput] = useState("");
+  const [output, setOutput] = useState<{ markdown: string; html: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -39,7 +39,11 @@ export default function App() {
     setError(null);
     try {
       const result = await generateTailoredResume(cvText, jobDescription);
-      setOutput(result || "");
+      if (typeof result === 'string') {
+        setOutput({ markdown: result, html: "" });
+      } else {
+        setOutput(result);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -48,13 +52,28 @@ export default function App() {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(output);
+    if (!output) return;
+    navigator.clipboard.writeText(output.markdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const downloadHtml = () => {
+    if (!output || !output.html) return;
+    const blob = new Blob([output.html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Tailored_Resume_Printable.html";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const downloadText = () => {
-    const blob = new Blob([output], { type: "text/markdown" });
+    if (!output) return;
+    const blob = new Blob([output.markdown], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -89,13 +108,21 @@ export default function App() {
           </nav>
           <div className="flex gap-2">
             {output && (
-              <button 
-                onClick={downloadText}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-none font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Export
-              </button>
+              <>
+                <button 
+                  onClick={downloadText}
+                  className="bg-white border border-gray-200 text-black px-4 py-3 rounded-none font-black text-xs uppercase tracking-widest transition-all hover:bg-gray-50 flex items-center gap-2"
+                >
+                  Markdown
+                </button>
+                <button 
+                  onClick={downloadHtml}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-none font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Printable HTML (PDF)
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -248,7 +275,7 @@ export default function App() {
                       prose-li:text-[12px] prose-li:my-1
                       prose-ul:my-2"
                   >
-                    <ReactMarkdown>{output}</ReactMarkdown>
+                    <ReactMarkdown>{output.markdown}</ReactMarkdown>
                   </motion.div>
                 )}
               </AnimatePresence>
